@@ -1,25 +1,26 @@
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routers import command
 
-class RobotCommander(Node):
-    def __init__(self):
-        super().__init__('robot_commander')
-        self.publisher = self.create_publisher(
-            Twist, '/turtle1/cmd_vel', 10)
+app = FastAPI(
+    title="NL2RC API",
+    description="Natural Language to Robot Command",
+    version="1.0.0"
+)
 
-    def move_forward(self, speed=0.5, duration=2):
-        msg = Twist()
-        msg.linear.x = speed
-        self.publisher.publish(msg)
-        self.get_logger().info(f'Moving forward!')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def main():
-    rclpy.init()
-    node = RobotCommander()
-    node.move_forward()
-    rclpy.spin_once(node)
-    rclpy.shutdown()
+app.include_router(command.router, prefix="/api/v1")
 
-if __name__ == '__main__':
-    main()
+@app.get("/")
+async def root():
+    return {"status": "NL2RC API running", "version": "1.0.0"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
