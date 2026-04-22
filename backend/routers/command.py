@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from core.safety import validate_command
+from core.model import parse_command
 
 router = APIRouter()
 
@@ -16,28 +17,12 @@ class CommandResponse(BaseModel):
 
 @router.post("/command", response_model=CommandResponse)
 async def process_command(request: CommandRequest):
-    
-    # Step 1: Basic parsed response (model integration baad mein)
-    parsed = {
-        "original_input": request.text,
-        "intent": "navigate",
-        "plan": [
-            {
-                "step": 1,
-                "action": "move",
-                "params": {
-                    "direction": "forward",
-                    "distance": 2.0,
-                    "velocity": 0.2,
-                    "unit": "meters"
-                }
-            }
-        ],
-        "safety_check": "pending",
-        "confidence": 0.97,
-        "clarification_needed": None,
-        "estimated_time_seconds": 10
-    }
+
+    # Step 1: Parse karo
+    parsed = parse_command(request.text)
+
+    if parsed is None:
+        raise HTTPException(status_code=503, detail="Parser failed.")
 
     # Step 2: Safety check
     safety_result = validate_command(parsed)
@@ -48,10 +33,19 @@ async def process_command(request: CommandRequest):
             detail=f"Safety check failed: {safety_result['reason']}"
         )
 
+    # Step 3: ROS2 execute
+    try:
+        import sys, os
+        sys.path.insert(0, '/mnt/c/Users/kamal/Desktop/projects/nl2rc-robotics/backend')
+        from ros2_bridge import execute_command
+        execute_command(parsed)
+    except Exception as e:
+        print(f"ROS2 error: {e}")
+
     return CommandResponse(
         original_input=request.text,
-        intent=parsed["intent"],
+        intent=parsed.get("intent", "unknown"),
         safety=safety_result,
         parsed=parsed,
-        message="Command validated successfully"
+        message="Command executed successfully"
     )
