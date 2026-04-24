@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from core.safety import validate_command
 from core.model import parse_command
+import asyncio
 
 router = APIRouter()
 
@@ -33,12 +34,11 @@ async def process_command(request: CommandRequest):
             detail=f"Safety check failed: {safety_result['reason']}"
         )
 
-    # Step 3: ROS2 execute
+    # Step 3: ROS2 execute (non-blocking)
     try:
-        import sys, os
-        sys.path.insert(0, '/mnt/c/Users/kamal/Desktop/projects/nl2rc-robotics/backend')
         from ros2_bridge import execute_command
-        execute_command(parsed)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, execute_command, parsed)
     except Exception as e:
         print(f"ROS2 error: {e}")
 
